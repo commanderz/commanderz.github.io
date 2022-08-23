@@ -538,12 +538,12 @@ body {
 		//const maxY = garden.clientHeight - ball.clientHeight;
 
 		function handleOrientation(event) {
-			const output = document.querySelector('.description');
+			//const output = document.querySelector('.description');
 			let x = event.beta;  // In degree in the range [-180,180)
 			let y = event.gamma; // In degree in the range [-90,90)
             
-			output.textContent  = `beta : ${x}\n`;
-			output.textContent += `gamma: ${y}\n`;
+			//output.textContent  = `beta : ${x}\n`;
+			//output.textContent += `gamma: ${y}\n`;
 			if ((x==null) || (y==null)) {  return; }
 
 			// Because we don't want to have the device upside down
@@ -573,13 +573,14 @@ body {
 			  to('.bg', { x: 100 - 200 * winPercent.x, y: 20 - 40 * winPercent.y }, 0);
 		}
 
-		window.addEventListener('deviceorientation', handleOrientation);
+		//window.addEventListener('deviceorientation', handleOrientation);
 
 		</script>
 
 		<!-- script src="script.js"></script -->
 		<script>
 		window.onload = function() {
+			window.addEventListener('deviceorientation', handleOrientation);
 			var centerform= document.querySelector( '.CenterForm');
 
 			var btn = document.querySelector( '.btn' );
