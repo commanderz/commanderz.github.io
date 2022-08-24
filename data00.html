@@ -543,8 +543,8 @@ body {
 			// x and y to [0,180]
 			//x += 90;
 			//y += 90;
-            x=x*10;
-			y=y*10;
+            x=x*3;
+			y=y*3;
 			// 10 is half the size of the ball
 			// It center the positioning point to the center of the ball
 			//     ball.style.top  = `${maxY * y / 180 - 10}px`;      //rem orig 
@@ -621,14 +621,14 @@ body {
 				var mx2 = event.clientX - btn2.offsetLeft,
 					my2 = event.clientY - btn2.offsetTop;
 
-				var w = btn2.offsetWidth,
-					h = btn2.offsetHeight;
+				var w2 = btn2.offsetWidth,
+					h2 = btn2.offsetHeight;
 
 				var directions2 = [
-					{ id: 'top', x: w/2, y: 0 },
-					{ id: 'right', x: w, y: h/2 },
-					{ id: 'bottom', x: w/2, y: h },
-					{ id: 'left', x: 0, y: h/2 }
+					{ id: 'top', x: w2/2, y: 0 },
+					{ id: 'right', x: w2, y: h2/2 },
+					{ id: 'bottom', x: w2/2, y: h2 },
+					{ id: 'left', x: 0, y: h2/2 }
 				];
 
 				directions2.sort( function( a, b ) {
