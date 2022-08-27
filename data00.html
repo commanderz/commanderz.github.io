@@ -562,7 +562,7 @@ body {
 
 				
 		    }
-			window.onresize = centerMain;
+			//window.onresize = centerMain;
 			
 			/*
 			window.onmousemove = e => {
@@ -616,7 +616,7 @@ body {
             //GO GO GO to do effects:   
 			let winPercent = { x: x / window.innerWidth, y: y / window.innerHeight },
 			  distFromCenter = 1 - Math.abs((x - window.innerWidth / 2) / window.innerWidth * 2);
-			  centerMain();//fix
+			  //centerMain();//fix
 			  gsap.timeline({ defaults: { duration: 0.5, overwrite: 'auto' } }).
 			  to('.card', { rotation: -7 + 9 * winPercent.x }, 0).
 			  to('.fillLight', { opacity: distFromCenter }, 0).
@@ -631,7 +631,7 @@ body {
 			var svgImage=document.getElementById('SvgId');
 			svgImage.addEventListener('click', function(event){
 				location.href ="do:PlayMP3";
-				centerMain();//fix
+				//centerMain();//fix
 			});
 
 			
