@@ -1,8 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Protest+Riot&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@300;700&display=swap');
+
 
 body {
     margin: 0;
-    font-family: 'Protest Riot', sans-serif;
+    font-family: "Pacifico", serif;
+    font-weight: 300;
+    font-style: normal;
+
 }
   
 canvas {
@@ -40,7 +44,7 @@ canvas {
 
 h1 {
     font-weight: bold;
-    font-size: 4rem;
+    font-size: 2.5rem;
     text-transform: uppercase;
 }
 
