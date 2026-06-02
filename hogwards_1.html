@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grounds of Hogwarts School - 3D Scene</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #2a1f14; font-family: 'Georgia', serif; }
+canvas { display: block; }
+
+#title {
+  position: absolute;
+  top: 20px;
+  left: 30px;
+  background: linear-gradient(135deg, #d4b896, #c4a882, #b8976e);
+  border: 2px solid #8b6914;
+  border-radius: 5px;
+  padding: 15px 25px;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+#title h1 { color: #3a2a1a; font-size: 22px; text-transform: uppercase; letter-spacing: 2px; }
+#title h2 { color: #5a4a3a; font-size: 18px; margin-top: 2px; }
+
+.label {
+  position: absolute;
+  color: #2a1a0a;
+  font-family: 'Georgia', serif;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  pointer-events: none;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #f0e0c0, #e0d0a8);
+  border: 1px solid #a08050;
+  padding: 3px 10px;
+  border-radius: 3px;
+  box-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+
+#info {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  color: #a08060;
+  font-size: 11px;
+  z-index: 10;
+}
+
+#controls {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  color: #c0a080;
+  font-size: 12px;
+  z-index: 10;
+  background: rgba(30,20,10,0.7);
+  padding: 8px 12px;
+  border-radius: 5px;
+}
+</style>
+</head>
+<body>
+
+<div id="title">
+  <h1>Grounds of</h1>
+  <h2>Hogwarts School</h2>
+</div>
+
+<div id="controls">️ Ліва кнопка - обертання | Колесо - масштабування | Права кнопка - переміщення</div>
+<div id="info">Hogwarts 3D Map</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// Scene setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8B7355);
+
+// Isometric-style camera
+const aspect = window.innerWidth / window.innerHeight;
+const frustumSize = 60;
+const camera = new THREE.OrthographicCamera(
+  frustumSize * aspect / -2, frustumSize * aspect / 2,
+  frustumSize / 2, frustumSize / -2, 0.1, 1000
+);
+camera.position.set(40, 40, 40);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Controls
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.minZoom = 0.5;
+controls.maxZoom = 3;
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xf0e0c0, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.0);
+dirLight.position.set(20, 40, 20);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 100;
+dirLight.shadow.camera.left = -30;
+dirLight.shadow.camera.right = 30;
+dirLight.shadow.camera.top = 30;
+dirLight.shadow.camera.bottom = -30;
+scene.add(dirLight);
+
+const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.3);
+scene.add(hemiLight);
+
+// Materials
+const groundMat = new THREE.MeshLambertMaterial({ color: 0xd4b896 });
+const parchmentMat = new THREE.MeshLambertMaterial({ color: 0xe8d5b0 });
+const rockMat = new THREE.MeshLambertMaterial({ color: 0x808080 });
+const darkRockMat = new THREE.MeshLambertMaterial({ color: 0x606060 });
+const castleWallMat = new THREE.MeshLambertMaterial({ color: 0x9a8b7a });
+const castleRoofMat = new THREE.MeshLambertMaterial({ color: 0x4a5a6a });
+const towerMat = new THREE.MeshLambertMaterial({ color: 0x8b7a6a });
+const towerRoofMat = new THREE.MeshLambertMaterial({ color: 0x3a4a5a });
+const waterMat = new THREE.MeshPhongMaterial({ color: 0x2a7a8a, transparent: true, opacity: 0.85, shininess: 100 });
+const treeMat = new THREE.MeshLambertMaterial({ color: 0x1a4a2a });
+const treeTrunkMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+const redMat = new THREE.MeshLambertMaterial({ color: 0xaa2222 });
+const smokeMat = new THREE.MeshLambertMaterial({ color: 0xcccccc, transparent: true, opacity: 0.6 });
+const woodMat = new THREE.MeshLambertMaterial({ color: 0x6a4a2a });
+const roofMat = new THREE.MeshLambertMaterial({ color: 0x5a4030 });
+const pumpkinMat = new THREE.MeshLambertMaterial({ color: 0xcc6600 });
+const pitchGrassMat = new THREE.MeshLambertMaterial({ color: 0x4a8a3a });
+const pitchRingMat = new THREE.MeshLambertMaterial({ color: 0x707070 });
+const squidMat = new THREE.MeshLambertMaterial({ color: 0x5a6a5a });
+const willowMat = new THREE.MeshLambertMaterial({ color: 0x3a2a1a });
+const willowLeafMat = new THREE.MeshLambertMaterial({ color: 0x2a3a1a });
+const gateMat = new THREE.MeshLambertMaterial({ color: 0x7a7a7a });
+const pathMat = new THREE.MeshLambertMaterial({ color: 0xc4a882 });
+
+// Ground / Parchment base
+const groundGeo = new THREE.PlaneGeometry(80, 80);
+const ground = new THREE.Mesh(groundGeo, parchmentMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.1;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Border frame
+const borderGeo = new THREE.BoxGeometry(82, 0.5, 82);
+const borderMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+const border = new THREE.Mesh(borderGeo, borderMat);
+border.position.y = -0.3;
+scene.add(border);
+
+// ============ THE LAKE ============
+const lakeGroup = new THREE.Group();
+const lakeGeo = new THREE.CircleGeometry(12, 32);
+const lake = new THREE.Mesh(lakeGeo, waterMat);
+lake.rotation.x = -Math.PI / 2;
+lake.position.y = 0.05;
+lake.receiveShadow = true;
+lakeGroup.add(lake);
+
+// Lake shore
+const shoreGeo = new THREE.RingGeometry(11.5, 13, 32);
+const shoreMat = new THREE.MeshLambertMaterial({ color: 0xc4a882 });
+const shore = new THREE.Mesh(shoreGeo, shoreMat);
+shore.rotation.x = -Math.PI / 2;
+shore.position.y = 0.02;
+lakeGroup.add(shore);
+
+// Giant Squid
+const squidGroup = new THREE.Group();
+const squidBody = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 6), squidMat);
+squidBody.scale.set(1.5, 0.6, 1);
+squidGroup.add(squidBody);
+
+for (let i = 0; i < 8; i++) {
+  const angle = (i / 8) * Math.PI * 2;
+  const tentacle = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.05, 3, 6), squidMat);
+  tentacle.position.set(Math.cos(angle) * 1.2, 0, Math.sin(angle) * 1.2);
+  tentacle.rotation.set(0.3, angle, 0.2);
+  squidGroup.add(tentacle);
+}
+squidGroup.position.set(2, 0.2, 2);
+lakeGroup.add(squidGroup);
+
+// Small boats on lake
+function createBoat(x, z, rot) {
+  const boat = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.5), woodMat);
+  hull.position.y = 0.15;
+  boat.add(hull);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.3), woodMat);
+  seat.position.y = 0.35;
+  boat.add(seat);
+  boat.position.set(x, 0.1, z);
+  boat.rotation.y = rot;
+  return boat;
+}
+lakeGroup.add(createBoat(-5, -4, 0.5));
+lakeGroup.add(createBoat(6, 3, -0.3));
+lakeGroup.add(createBoat(-3, 5, 1.2));
+lakeGroup.add(createBoat(4, -5, 0.8));
+
+lakeGroup.position.set(0, 0, 0);
+scene.add(lakeGroup);
+
+// ============ HOGWARTS CASTLE (on rocky island) ============
+const castleGroup = new THREE.Group();
+
+// Rocky island
+const islandGeo = new THREE.CylinderGeometry(10, 12, 4, 16);
+const island = new THREE.Mesh(islandGeo, rockMat);
+island.position.y = -1.5;
+island.castShadow = true;
+castleGroup.add(island);
+
+// More rocks
+for (let i = 0; i < 8; i++) {
+  const angle = (i / 8) * Math.PI * 2;
+  const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5 + Math.random()), darkRockMat);
+  rock.position.set(Math.cos(angle) * 9, -2.5, Math.sin(angle) * 9);
+  rock.castShadow = true;
+  castleGroup.add(rock);
+}
+
+// Main castle building
+function createTower(x, y, z, height, radius, roofHeight) {
+  const tower = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.1, height, 8), towerMat);
+  body.position.y = height / 2;
+  body.castShadow = true;
+  tower.add(body);
+
+  // Roof (cone)
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(radius * 1.3, roofHeight, 8), towerRoofMat);
+  roof.position.y = height + roofHeight / 2;
+  roof.castShadow = true;
+  tower.add(roof);
+
+  // Spire
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(0.15, 1.5, 4), darkRockMat);
+  spire.position.y = height + roofHeight + 0.75;
+  tower.add(spire);
+
+  // Windows
+  for (let w = 0; w < 3; w++) {
+    const window = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.5), new THREE.MeshLambertMaterial({ color: 0x111111 }));
+    window.position.set(radius * 1.01, 1 + w * 1.5, 0);
+    tower.add(window);
+  }
+
+  tower.position.set(x, y, z);
+  return tower;
+}
+
+// Main keep
+const mainKeep = new THREE.Mesh(new THREE.BoxGeometry(8, 10, 8), castleWallMat);
+mainKeep.position.y = 5.5;
+mainKeep.castShadow = true;
+castleGroup.add(mainKeep);
+
+// Main roof
+const mainRoof = new THREE.Mesh(new THREE.ConeGeometry(6, 4, 4), castleRoofMat);
+mainRoof.position.y = 12.5;
+mainRoof.rotation.y = Math.PI / 4;
+mainRoof.castShadow = true;
+castleGroup.add(mainRoof);
+
+// Towers
+castleGroup.add(createTower(-5, 0.5, -5, 12, 1.5, 4));
+castleGroup.add(createTower(5, 0.5, -5, 14, 1.8, 4.5));
+castleGroup.add(createTower(-6, 0.5, 4, 10, 1.3, 3.5));
+castleGroup.add(createTower(6, 0.5, 4, 11, 1.4, 3.8));
+castleGroup.add(createTower(0, 0.5, -7, 16, 2, 5));
+castleGroup.add(createTower(-3, 0.5, 6, 9, 1.2, 3));
+castleGroup.add(createTower(4, 0.5, 6, 8, 1.1, 2.8));
+
+// Walls connecting towers
+function createWall(x1, z1, x2, z2, height) {
+  const length = Math.sqrt((x2-x1)**2 + (z2-z1)**2);
+  const angle = Math.atan2(x2-x1, z2-z1);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(1.5, height, length), castleWallMat);
+  wall.position.set((x1+x2)/2, height/2 + 0.5, (z1+z2)/2);
+  wall.rotation.y = angle;
+  wall.castShadow = true;
+  return wall;
+}
+
+castleGroup.add(createWall(-5, -5, 5, -5, 7));
+castleGroup.add(createWall(5, -5, 6, 4, 7));
+castleGroup.add(createWall(6, 4, 4, 6, 6));
+castleGroup.add(createWall(4, 6, -3, 6, 6));
+castleGroup.add(createWall(-3, 6, -6, 4, 6));
+castleGroup.add(createWall(-6, 4, -5, -5, 7));
+
+// Bridge/Viaduct from castle
+const bridge = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 2), castleWallMat);
+bridge.position.set(0, 2, 12);
+bridge.castShadow = true;
+castleGroup.add(bridge);
+
+// Bridge pillars
+for (let i = 0; i < 4; i++) {
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 3, 6), darkRockMat);
+  pillar.position.set(-3 + i * 2, 1.5, 12);
+  pillar.castShadow = true;
+  castleGroup.add(pillar);
+}
+
+castleGroup.position.set(5, 0, -12);
+scene.add(castleGroup);
+
+// ============ QUIDDITCH PITCH ============
+const quidditchGroup = new THREE.Group();
+
+// Pitch ring
+const pitchRing = new THREE.Mesh(new THREE.TorusGeometry(5, 0.3, 8, 32), pitchRingMat);
+pitchRing.rotation.x = -Math.PI / 2;
+pitchRing.position.y = 0.3;
+quidditchGroup.add(pitchRing);
+
+// Goal posts (6 pillars - 3 hoops per side)
+for (let side = -1; side <= 1; side += 2) {
+  for (let i = -1; i <= 1; i++) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 4, 6), pitchRingMat);
+    post.position.set(i * 1.5, 2.3, side * 4.5);
+    post.castShadow = true;
+    quidditchGroup.add(post);
+  }
+}
+
+// Grass inside
+const pitchGrass = new THREE.Mesh(new THREE.CircleGeometry(4.8, 32), pitchGrassMat);
+pitchGrass.rotation.x = -Math.PI / 2;
+pitchGrass.position.y = 0.05;
+quidditchGroup.add(pitchGrass);
+
+quidditchGroup.position.set(18, 0, -15);
+scene.add(quidditchGroup);
+
+// ============ WHOMPING WILLOW ============
+const willowGroup = new THREE.Group();
+
+// Trunk
+const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 5, 8), willowMat);
+trunk.position.y = 2.5;
+trunk.castShadow = true;
+willowGroup.add(trunk);
+
+// Branches
+for (let i = 0; i < 12; i++) {
+  const angle = (i / 12) * Math.PI * 2;
+  const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 4, 4), willowMat);
+  branch.position.set(Math.cos(angle) * 1.5, 4.5, Math.sin(angle) * 1.5);
+  branch.rotation.set(Math.cos(angle) * 0.6, angle, Math.sin(angle) * 0.6);
+  branch.castShadow = true;
+  willowGroup.add(branch);
+
+  // Leaves at branch ends
+  const leaves = new THREE.Mesh(new THREE.SphereGeometry(0.8, 6, 4), willowLeafMat);
+  leaves.position.set(Math.cos(angle) * 3, 5.5, Math.sin(angle) * 3);
+  leaves.castShadow = true;
+  willowGroup.add(leaves);
+}
+
+// Roots
+for (let i = 0; i < 6; i++) {
+  const angle = (i / 6) * Math.PI * 2;
+  const root = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 2, 4), willowMat);
+  root.position.set(Math.cos(angle) * 1.5, 0.5, Math.sin(angle) * 1.5);
+  root.rotation.z = Math.cos(angle) * 0.5;
+  root.rotation.x = Math.sin(angle) * 0.5;
+  willowGroup.add(root);
+}
+
+willowGroup.position.set(15, 0, -5);
+scene.add(willowGroup);
+
+// ============ FORBIDDEN FOREST ============
+const forestGroup = new THREE.Group();
+
+function createTree(x, z, scale) {
+  const tree = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 2, 6), treeTrunkMat);
+  trunk.position.y = 1;
+  trunk.castShadow = true;
+  tree.add(trunk);
+
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(1.5 * scale, 3 * scale, 8), treeMat);
+  cone.position.y = 3 * scale;
+  cone.castShadow = true;
+  tree.add(cone);
+
+  const cone2 = new THREE.Mesh(new THREE.ConeGeometry(1.2 * scale, 2.5 * scale, 8), treeMat);
+  cone2.position.y = 4.5 * scale;
+  cone2.castShadow = true;
+  tree.add(cone2);
+
+  tree.position.set(x, 0, z);
+  return tree;
+}
+
+// Dense forest
+for (let i = 0; i < 25; i++) {
+  const x = (Math.random() - 0.5) * 14;
+  const z = (Math.random() - 0.5) * 14;
+  if (Math.sqrt(x*x + z*z) > 2) {
+    const scale = 0.7 + Math.random() * 0.6;
+    forestGroup.add(createTree(x, z, scale));
+  }
+}
+
+forestGroup.position.set(22, 0, 8);
+scene.add(forestGroup);
+
+// ============ HAGRID'S HUT ============
+const hagridGroup = new THREE.Group();
+
+// Main hut
+const hutBody = new THREE.Mesh(new THREE.BoxGeometry(4, 2.5, 3), woodMat);
+hutBody.position.y = 1.25;
+hutBody.castShadow = true;
+hagridGroup.add(hutBody);
+
+// Roof
+const hutRoof = new THREE.Mesh(new THREE.ConeGeometry(3, 2, 4), roofMat);
+hutRoof.position.y = 3.5;
+hutRoof.rotation.y = Math.PI / 4;
+hutRoof.castShadow = true;
+hagridGroup.add(hutRoof);
+
+// Door
+const door = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.5, 0.1), new THREE.MeshLambertMaterial({ color: 0x3a2a1a }));
+door.position.set(0, 0.75, 1.55);
+hagridGroup.add(door);
+
+// Windows
+const windowGeo = new THREE.BoxGeometry(0.6, 0.6, 0.1);
+const windowMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+const w1 = new THREE.Mesh(windowGeo, windowMat);
+w1.position.set(-1.2, 1.5, 1.55);
+hagridGroup.add(w1);
+const w2 = new THREE.Mesh(windowGeo, windowMat);
+w2.position.set(1.2, 1.5, 1.55);
+hagridGroup.add(w2);
+
+// Chimney
+const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2, 0.8), rockMat);
+chimney.position.set(1, 3, -0.5);
+chimney.castShadow = true;
+hagridGroup.add(chimney);
+
+// Pumpkins
+function createPumpkin(x, z, scale) {
+  const p = new THREE.Mesh(new THREE.SphereGeometry(0.3 * scale, 8, 6), pumpkinMat);
+  p.scale.y = 0.7;
+  p.position.set(x, 0.2 * scale, z);
+  p.castShadow = true;
+  return p;
+}
+
+for (let i = 0; i < 8; i++) {
+  const px = (Math.random() - 0.5) * 4;
+  const pz = 2 + Math.random() * 2;
+  hagridGroup.add(createPumpkin(px, pz, 0.5 + Math.random() * 0.8));
+}
+
+// Fence
+for (let i = 0; i < 8; i++) {
+  const fence = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), woodMat);
+  const angle = (i / 8) * Math.PI * 2;
+  fence.position.set(Math.cos(angle) * 4, 0.4, 2.5 + Math.sin(angle) * 2);
+  hagridGroup.add(fence);
+}
+
+hagridGroup.position.set(15, 0, 12);
+scene.add(hagridGroup);
+
+// ============ HOGSMEADE VILLAGE ============
+const villageGroup = new THREE.Group();
+
+function createHouse(x, z, w, h, d, roofH) {
+  const house = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), castleWallMat);
+  body.position.y = h / 2;
+  body.castShadow = true;
+  house.add(body);
+
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.8, roofH, 4), roofMat);
+  roof.position.y = h + roofH / 2;
+  roof.rotation.y = Math.PI / 4;
+  roof.castShadow = true;
+  house.add(roof);
+
+  // Chimney
+  const chim = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), rockMat);
+  chim.position.set(w * 0.3, h + roofH * 0.7, 0);
+  house.add(chim);
+
+  // Windows
+  const winMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  for (let wx = -1; wx <= 1; wx += 2) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.1), winMat);
+    win.position.set(wx * w * 0.25, h * 0.6, d / 2 + 0.05);
+    house.add(win);
+  }
+
+  house.position.set(x, 0, z);
+  return house;
+}
+
+// Multiple houses
+villageGroup.add(createHouse(-8, 2, 3, 3, 2.5, 2));
+villageGroup.add(createHouse(-4, 3, 2.5, 2.5, 2, 1.8));
+villageGroup.add(createHouse(-6, -1, 3.5, 3.5, 3, 2.2));
+villageGroup.add(createHouse(-2, -2, 2, 2, 2, 1.5));
+villageGroup.add(createHouse(-10, -2, 2.5, 2.5, 2.5, 1.8));
+villageGroup.add(createHouse(-12, 1, 3, 2.8, 2.5, 2));
+villageGroup.add(createHouse(-14, -1, 2, 2.2, 2, 1.5));
+
+villageGroup.position.set(0, 0, 10);
+scene.add(villageGroup);
+
+// ============ SHRIEKING SHACK ============
+const shackGroup = new THREE.Group();
+
+// Dilapidated structure
+const shackBody = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 2.5), new THREE.MeshLambertMaterial({ color: 0x5a4a3a }));
+shackBody.position.y = 1.5;
+shackBody.castShadow = true;
+shackGroup.add(shackBody);
+
+// Broken roof
+const shackRoof = new THREE.Mesh(new THREE.ConeGeometry(2.5, 1.5, 4), roofMat);
+shackRoof.position.y = 3.7;
+shackRoof.rotation.y = Math.PI / 4;
+shackRoof.rotation.z = 0.1;
+shackRoof.castShadow = true;
+shackGroup.add(shackRoof);
+
+// Broken walls (leaning)
+const brokenWall1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 2.5), woodMat);
+brokenWall1.position.set(1.6, 1.25, 0);
+brokenWall1.rotation.z = 0.15;
+shackGroup.add(brokenWall1);
+
+const brokenWall2 = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 0.2), woodMat);
+brokenWall2.position.set(0, 1, 1.35);
+brokenWall2.rotation.x = -0.1;
+shackGroup.add(brokenWall2);
+
+// Boarded windows
+for (let i = 0; i < 3; i++) {
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.15, 0.1), woodMat);
+  board.position.set(0, 1 + i * 0.5, 1.3);
+  board.rotation.z = 0.3 * (i % 2 === 0 ? 1 : -1);
+  shackGroup.add(board);
+}
+
+shackGroup.position.set(-16, 0, -3);
+scene.add(shackGroup);
+
+// ============ HOGWARTS EXPRESS ============
+const trainGroup = new THREE.Group();
+
+// Locomotive
+const engine = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 1.8), redMat);
+engine.position.y = 1.5;
+engine.castShadow = true;
+trainGroup.add(engine);
+
+// Engine front (rounded)
+const engineFront = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.8, 8), redMat);
+engineFront.rotation.x = Math.PI / 2;
+engineFront.position.set(2, 1.5, 0);
+trainGroup.add(engineFront);
+
+// Chimney
+const trainChimney = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1, 8), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+trainChimney.position.set(-0.5, 3.2, 0);
+trainGroup.add(trainChimney);
+
+// Cab
+const cab = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 1.8), redMat);
+cab.position.set(-2.5, 1.5, 0);
+cab.castShadow = true;
+trainGroup.add(cab);
+
+// Wheels
+for (let i = 0; i < 4; i++) {
+  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+  wheel.rotation.x = Math.PI / 2;
+  wheel.position.set(-1 + i * 1.2, 0.4, 1);
+  trainGroup.add(wheel);
+  const wheel2 = wheel.clone();
+  wheel2.position.z = -1;
+  trainGroup.add(wheel2);
+}
+
+// Carriages
+for (let c = 0; c < 3; c++) {
+  const carriage = new THREE.Mesh(new THREE.BoxGeometry(4, 2.2, 1.6), new THREE.MeshLambertMaterial({ color: 0x881111 }));
+  carriage.position.set(-5.5 - c * 4.5, 1.3, 0);
+  carriage.castShadow = true;
+  trainGroup.add(carriage);
+
+  // Carriage wheels
+  for (let w = 0; w < 2; w++) {
+    const cw = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+    cw.rotation.x = Math.PI / 2;
+    cw.position.set(-4 - c * 4.5 + w * 2, 0.4, 0.9);
+    trainGroup.add(cw);
+    const cw2 = cw.clone();
+    cw2.position.z = -0.9;
+    trainGroup.add(cw2);
+  }
+}
+
+// Smoke from chimney
+const smokeParticles = [];
+for (let i = 0; i < 8; i++) {
+  const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.5 + i * 0.3, 8, 6), smokeMat);
+  smoke.position.set(-0.5 - i * 1.2, 3.5 + i * 0.8, Math.sin(i) * 0.5);
+  smokeParticles.push(smoke);
+  trainGroup.add(smoke);
+}
+
+// Train tracks
+const trackMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+const trackGeo = new THREE.BoxGeometry(25, 0.1, 0.15);
+const track1 = new THREE.Mesh(trackGeo, trackMat);
+track1.position.set(-8, 0.05, 1);
+trainGroup.add(track1);
+const track2 = track1.clone();
+track2.position.z = -1;
+trainGroup.add(track2);
+
+// Sleepers
+for (let i = 0; i < 20; i++) {
+  const sleeper = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 2.5), woodMat);
+  sleeper.position.set(-20 + i * 1.2, 0.04, 0);
+  trainGroup.add(sleeper);
+}
+
+trainGroup.position.set(-5, 0, 20);
+trainGroup.rotation.y = -0.3;
+scene.add(trainGroup);
+
+// ============ GATES ============
+const gatesGroup = new THREE.Group();
+
+// Gate pillars
+const pillarGeo = new THREE.BoxGeometry(1, 4, 1);
+const leftPillar = new THREE.Mesh(pillarGeo, gateMat);
+leftPillar.position.set(-2, 2, 0);
+leftPillar.castShadow = true;
+gatesGroup.add(leftPillar);
+
+const rightPillar = new THREE.Mesh(pillarGeo, gateMat);
+rightPillar.position.set(2, 2, 0);
+rightPillar.castShadow = true;
+gatesGroup.add(rightPillar);
+
+// Gargoyles on top
+function createGargoyle(x) {
+  const gargoyle = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 6, 4), gateMat);
+  body.position.y = 4.5;
+  gargoyle.add(body);
+  const wings = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.6), gateMat);
+  wings.position.y = 4.8;
+  gargoyle.add(wings);
+  gargoyle.position.x = x;
+  return gargoyle;
+}
+gatesGroup.add(createGargoyle(-2));
+gatesGroup.add(createGargoyle(2));
+
+// Gate bars
+for (let i = -1.5; i <= 1.5; i += 0.5) {
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 4), gateMat);
+  bar.position.set(i, 1.5, 0);
+  gatesGroup.add(bar);
+}
+
+gatesGroup.position.set(-5, 0, -5);
+scene.add(gatesGroup);
+
+// ============ PATHS (dotted lines) ============
+function createPath(points) {
+  const pathGroup = new THREE.Group();
+  const pathMat2 = new THREE.MeshLambertMaterial({ color: 0xa08060 });
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const dx = p2[0] - p1[0];
+    const dz = p2[2] - p1[2];
+    const length = Math.sqrt(dx * dx + dz * dz);
+    const angle = Math.atan2(dx, dz);
+
+    const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 6), pathMat2);
+    dot.rotation.x = -Math.PI / 2;
+    dot.position.set(p1[0], 0.08, p1[2]);
+    pathGroup.add(dot);
+  }
+  // Add last dot
+  const lastDot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 6), pathMat2);
+  lastDot.rotation.x = -Math.PI / 2;
+  lastDot.position.set(points[points.length-1][0], 0.08, points[points.length-1][2]);
+  pathGroup.add(lastDot);
+  return pathGroup;
+}
+
+// Path from castle to gates
+const path1 = [];
+for (let i = 0; i <= 20; i++) {
+  const t = i / 20;
+  path1.push([5 - t * 10, 0, -12 + t * 7]);
+}
+scene.add(createPath(path1));
+
+// Path from lake to village
+const path2 = [];
+for (let i = 0; i <= 15; i++) {
+  const t = i / 15;
+  path2.push([-10 + t * 2, 0, 0 + t * 10]);
+}
+scene.add(createPath(path2));
+
+// Path around lake
+const path3 = [];
+for (let i = 0; i <= 20; i++) {
+  const t = i / 20;
+  const angle = -Math.PI * 0.3 + t * Math.PI * 0.8;
+  path3.push([Math.cos(angle) * 14, 0, Math.sin(angle) * 14 - 5]);
+}
+scene.add(createPath(path3));
+
+// ============ LABELS (CSS) ============
+const labelData = [
+  { text: "Hogwarts", pos: [5, 18, -12] },
+  { text: "The Lake", pos: [0, 1, 0] },
+  { text: "Quidditch Pitch", pos: [18, 6, -15] },
+  { text: "Whomping Willow", pos: [15, 7, -5] },
+  { text: "Forbidden Forest", pos: [22, 6, 8] },
+  { text: "Hagrid's Hut", pos: [15, 4, 12] },
+  { text: "Hogsmeade Village", pos: [-8, 5, 10] },
+  { text: "Shrieking Shack", pos: [-16, 5, -3] },
+  { text: "Hogwarts Express", pos: [-5, 5, 20] },
+];
+
+const labelElements = [];
+labelData.forEach(ld => {
+  const div = document.createElement('div');
+  div.className = 'label';
+  div.textContent = ld.text;
+  document.body.appendChild(div);
+  labelElements.push({ el: div, pos: new THREE.Vector3(...ld.pos) });
+});
+
+// ============ ANIMATION ============
+let time = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.016;
+
+  controls.update();
+
+  // Animate squid tentacles
+  squidGroup.children.forEach((child, i) => {
+    if (i > 0) {
+      child.rotation.z = 0.2 + Math.sin(time * 2 + i) * 0.1;
+    }
+  });
+
+  // Animate smoke
+  smokeParticles.forEach((smoke, i) => {
+    smoke.position.y = 3.5 + i * 0.8 + Math.sin(time + i * 0.5) * 0.3;
+    smoke.position.x = -0.5 - i * 1.2 - time * 0.5 % 2;
+    smoke.scale.setScalar(0.8 + Math.sin(time * 2 + i) * 0.2);
+  });
+
+  // Animate willow branches
+  willowGroup.children.forEach((child, i) => {
+    if (i > 1 && i < 13) {
+      child.rotation.z = Math.sin(time * 3 + i) * 0.1;
+    }
+  });
+
+  // Update labels
+  labelElements.forEach(({ el, pos }) => {
+    const projected = pos.clone().project(camera);
+    const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+
+    // Hide if behind camera
+    if (projected.z > 1) {
+      el.style.display = 'none';
+    } else {
+      el.style.display = 'block';
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+// Handle resize
+window.addEventListener('resize', () => {
+  const aspect = window.innerWidth / window.innerHeight;
+  camera.left = frustumSize * aspect / -2;
+  camera.right = frustumSize * aspect / 2;
+  camera.top = frustumSize / 2;
+  camera.bottom = frustumSize / -2;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+</script>
+</body>
+</html>
