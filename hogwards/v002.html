@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Гоґвортс - 3D Карта</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #1a1a2e; font-family: 'Georgia', serif; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        #loading {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #2c1810; color: #d4a574; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1000; transition: opacity 1s;
+        }
+        #loading h1 { font-size: 2.5em; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        #loading p { font-size: 1.2em; opacity: 0.8; }
+        .scroll-decoration {
+            position: fixed; top: 20px; left: 20px; z-index: 100;
+            background: rgba(210, 180, 140, 0.15); border: 2px solid #8b7355;
+            border-radius: 8px; padding: 15px 20px; color: #d4a574;
+            backdrop-filter: blur(5px); max-width: 250px;
+        }
+        .scroll-decoration h2 { font-size: 1.3em; margin-bottom: 8px; border-bottom: 1px solid #8b7355; padding-bottom: 5px; }
+        .scroll-decoration p { font-size: 0.9em; line-height: 1.4; }
+        .legend-item { display: flex; align-items: center; margin: 5px 0; font-size: 0.85em; }
+        .legend-color { width: 12px; height: 12px; border-radius: 2px; margin-right: 8px; border: 1px solid rgba(255,255,255,0.3); }
+        #controls-hint {
+            position: fixed; bottom: 20px; right: 20px; z-index: 100;
+            background: rgba(0,0,0,0.4); color: #d4a574; padding: 10px 15px;
+            border-radius: 8px; font-size: 0.85em; backdrop-filter: blur(5px);
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div id="loading">
+        <h1>⚡ Гоґвортс завантажується...</h1>
+        <p>Підготовка чарівного світу</p>
+    </div>
+
+    <div class="scroll-decoration">
+        <h2>Grounds of Hogwarts</h2>
+        <p>Школа Чарів та Чаклунства</p>
+        <div style="margin-top: 10px;">
+            <div class="legend-item"><div class="legend-color" style="background: #5a5a5a;"></div>Замок Гоґвортс</div>
+            <div class="legend-item"><div class="legend-color" style="background: #1e5f8e;"></div>Озеро</div>
+            <div class="legend-item"><div class="legend-color" style="background: #1a4a1a;"></div>Заборонений Ліс</div>
+            <div class="legend-item"><div class="legend-color" style="background: #8b4513;"></div>Хижина Геґріда</div>
+            <div class="legend-item"><div class="legend-color" style="background: #d4a574;"></div>Гоґсмід</div>
+            <div class="legend-item"><div class="legend-color" style="background: #4a3728;"></div>Виттяча Хата</div>
+            <div class="legend-item"><div class="legend-color" style="background: #6b8e23;"></div>Поле для Квідичу</div>
+        </div>
+    </div>
+
+    <div id="controls-hint">
+        🖱️ ЛКМ — обертати | ПКМ — переміщувати | Колесо — масштаб
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
+
+        // Сцена
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 80, 250);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 60, 120);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2.1;
+        controls.minDistance = 20;
+        controls.maxDistance = 200;
+        controls.target.set(0, 10, 0);
+
+        // Освітлення
+        const ambientLight = new THREE.AmbientLight(0xfff8dc, 0.4);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 1.2);
+        sunLight.position.set(50, 100, 50);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 4096;
+        sunLight.shadow.mapSize.height = 4096;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 300;
+        sunLight.shadow.camera.left = -100;
+        sunLight.shadow.camera.right = 100;
+        sunLight.shadow.camera.top = 100;
+        sunLight.shadow.camera.bottom = -100;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3d5c3d, 0.5);
+        scene.add(hemiLight);
+
+        // Допоміжні функції текстур
+        function createStoneTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#7a7a7a';
+            ctx.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < 2000; i++) {
+                const shade = 100 + Math.random() * 80;
+                ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+                const x = Math.random() * 512;
+                const y = Math.random() * 512;
+                const w = 10 + Math.random() * 30;
+                const h = 8 + Math.random() * 20;
+                ctx.fillRect(x, y, w, h);
+                ctx.strokeStyle = `rgb(${shade-20},${shade-20},${shade-20})`;
+                ctx.strokeRect(x, y, w, h);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        function createRoofTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(0, 0, 512, 512);
+            for (let y = 0; y < 512; y += 16) {
+                for (let x = 0; x < 512; x += 32) {
+                    const offset = (y / 16) % 2 === 0 ? 0 : 16;
+                    const shade = 60 + Math.random() * 40;
+                    ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+                    ctx.fillRect(x + offset, y, 30, 14);
+                }
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        function createGroundTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#5a7a3a';
+            ctx.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < 5000; i++) {
+                const g = 80 + Math.random() * 60;
+                ctx.fillStyle = `rgb(${g-20},${g},${g-30})`;
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(10, 10);
+            return tex;
+        }
+
+        function createWaterTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e5f8e';
+            ctx.fillRect(0, 0, 256, 256);
+            for (let i = 0; i < 100; i++) {
+                ctx.fillStyle = `rgba(255,255,255,${0.05 + Math.random() * 0.1})`;
+                ctx.beginPath();
+                ctx.arc(Math.random() * 256, Math.random() * 256, 2 + Math.random() * 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        const stoneTexture = createStoneTexture();
+        const roofTexture = createRoofTexture();
+        const groundTexture = createGroundTexture();
+        const waterTexture = createWaterTexture();
+
+        // Матеріали
+        const stoneMat = new THREE.MeshStandardMaterial({ 
+            map: stoneTexture, 
+            roughness: 0.9, 
+            color: 0x888888 
+        });
+        const roofMat = new THREE.MeshStandardMaterial({ 
+            map: roofTexture, 
+            roughness: 0.8, 
+            color: 0x555555 
+        });
+        const darkStoneMat = new THREE.MeshStandardMaterial({ 
+            color: 0x4a4a4a, 
+            roughness: 0.95 
+        });
+        const woodMat = new THREE.MeshStandardMaterial({ 
+            color: 0x5c3a1e, 
+            roughness: 0.9 
+        });
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            map: groundTexture, 
+            roughness: 1, 
+            color: 0x6a8a4a 
+        });
+        const waterMat = new THREE.MeshStandardMaterial({ 
+            map: waterTexture, 
+            transparent: true, 
+            opacity: 0.8, 
+            roughness: 0.1, 
+            metalness: 0.3,
+            color: 0x2e7d9e
+        });
+        const treeMat = new THREE.MeshStandardMaterial({ 
+            color: 0x1a4a1a, 
+            roughness: 0.9 
+        });
+        const treeTrunkMat = new THREE.MeshStandardMaterial({ 
+            color: 0x3d2817, 
+            roughness: 1 
+        });
+        const pathMat = new THREE.MeshStandardMaterial({ 
+            color: 0xc4a882, 
+            roughness: 1 
+        });
+        const goldMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffd700, 
+            metalness: 0.8, 
+            roughness: 0.3 
+        });
+        const brickMat = new THREE.MeshStandardMaterial({ 
+            color: 0x8b4513, 
+            roughness: 0.9 
+        });
+        const hutMat = new THREE.MeshStandardMaterial({ 
+            color: 0x6b4226, 
+            roughness: 1 
+        });
+        const hutRoofMat = new THREE.MeshStandardMaterial({ 
+            color: 0x4a3728, 
+            roughness: 0.9 
+        });
+        const pumpkinMat = new THREE.MeshStandardMaterial({ 
+            color: 0xff7518, 
+            roughness: 0.7 
+        });
+        const smokeMat = new THREE.MeshStandardMaterial({ 
+            color: 0xdddddd, 
+            transparent: true, 
+            opacity: 0.4, 
+            roughness: 1 
+        });
+
+        // Групи
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        // ===== ЛАНДШАФТ =====
+        // Основна земля
+        const groundGeo = new THREE.PlaneGeometry(300, 300, 100, 100);
+        const posAttr = groundGeo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+            const x = posAttr.getX(i);
+            const y = posAttr.getY(i);
+            let z = 0;
+            // Озеро — в центрі
+            const distToLake = Math.sqrt(x * x + y * y);
+            if (distToLake < 35) {
+                z = -2 - Math.random() * 1;
+            } else if (distToLake < 45) {
+                z = -0.5;
+            } else {
+                z = Math.random() * 0.5;
+            }
+            // Пагорби
+            if (x > 20 && y > 10) z += 3;
+            if (x < -30 && y < -20) z += 2;
+            posAttr.setZ(i, z);
+        }
+        groundGeo.computeVertexNormals();
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        worldGroup.add(ground);
+
+        // Озеро
+        const lakeGeo = new THREE.CircleGeometry(35, 64);
+        const lake = new THREE.Mesh(lakeGeo, waterMat);
+        lake.rotation.x = -Math.PI / 2;
+        lake.position.y = -1.5;
+        worldGroup.add(lake);
+
+        // Скеля під замок
+        const cliffGeo = new THREE.CylinderGeometry(18, 22, 15, 16, 4);
+        const cliffPos = cliffGeo.attributes.position;
+        for (let i = 0; i < cliffPos.count; i++) {
+            const x = cliffPos.getX(i);
+            const z = cliffPos.getZ(i);
+            cliffPos.setX(i, x + (Math.random() - 0.5) * 3);
+            cliffPos.setZ(i, z + (Math.random() - 0.5) * 3);
+        }
+        cliffGeo.computeVertexNormals();
+        const cliffMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a, roughness: 0.95 });
+        const cliff = new THREE.Mesh(cliffGeo, cliffMat);
+        cliff.position.set(0, 5, 0);
+        cliff.castShadow = true;
+        cliff.receiveShadow = true;
+        worldGroup.add(cliff);
+
+        // ===== ЗАМОК ГОҐВОРТС =====
+        const castleGroup = new THREE.Group();
+        castleGroup.position.set(0, 13, 0);
+        worldGroup.add(castleGroup);
+
+        // Головна будівля
+        const mainBuilding = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 14), stoneMat);
+        mainBuilding.position.y = 6;
+        mainBuilding.castShadow = true;
+        mainBuilding.receiveShadow = true;
+        castleGroup.add(mainBuilding);
+
+        // Центральна вежа
+        const centralTower = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 4, 22, 12), stoneMat);
+        centralTower.position.set(0, 11, 0);
+        centralTower.castShadow = true;
+        castleGroup.add(centralTower);
+
+        const centralRoof = new THREE.Mesh(new THREE.ConeGeometry(4.5, 10, 12), roofMat);
+        centralRoof.position.set(0, 27, 0);
+        centralRoof.castShadow = true;
+        castleGroup.add(centralRoof);
+
+        // Додаткові вежі
+        const towerPositions = [
+            [-10, 0, -5], [10, 0, -5], [-10, 0, 5], [10, 0, 5],
+            [-6, 0, -8], [6, 0, -8], [0, 0, -8]
+        ];
+        towerPositions.forEach((pos, i) => {
+            const height = 14 + Math.random() * 8;
+            const radius = 2.5 + Math.random() * 1;
+            const tower = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.85, radius, height, 10), stoneMat);
+            tower.position.set(pos[0], height / 2, pos[2]);
+            tower.castShadow = true;
+            castleGroup.add(tower);
+
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(radius + 1, 7, 10), roofMat);
+            roof.position.set(pos[0], height + 3.5, pos[2]);
+            roof.castShadow = true;
+            castleGroup.add(roof);
+        });
+
+        // Великі бокові вежі
+        const bigTower1 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.5, 28, 12), stoneMat);
+        bigTower1.position.set(-14, 14, 0);
+        bigTower1.castShadow = true;
+        castleGroup.add(bigTower1);
+        const bigRoof1 = new THREE.Mesh(new THREE.ConeGeometry(5, 12, 12), roofMat);
+        bigRoof1.position.set(-14, 33, 0);
+        castleGroup.add(bigRoof1);
+
+        const bigTower2 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.5, 26, 12), stoneMat);
+        bigTower2.position.set(14, 13, 0);
+        bigTower2.castShadow = true;
+        castleGroup.add(bigTower2);
+        const bigRoof2 = new THREE.Mesh(new THREE.ConeGeometry(5, 11, 12), roofMat);
+        bigRoof2.position.set(14, 31, 0);
+        castleGroup.add(bigRoof2);
+
+        // Вікна (світяться)
+        const windowGeo = new THREE.PlaneGeometry(0.8, 1.5);
+        const windowMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffee88, 
+            emissive: 0xffaa00, 
+            emissiveIntensity: 0.5 
+        });
+        for (let i = 0; i < 30; i++) {
+            const win = new THREE.Mesh(windowGeo, windowMat);
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 3 + Math.random() * 10;
+            win.position.set(Math.cos(angle) * radius, 4 + Math.random() * 12, Math.sin(angle) * radius);
+            win.lookAt(0, win.position.y, 0);
+            castleGroup.add(win);
+        }
+
+        // Арки/міст
+        const bridgeGeo = new THREE.BoxGeometry(4, 6, 12);
+        const bridge = new THREE.Mesh(bridgeGeo, stoneMat);
+        bridge.position.set(0, 3, 12);
+        bridge.castShadow = true;
+        castleGroup.add(bridge);
+
+        // ===== ЗАБОРОНЕНИЙ ЛІС =====
+        const forestGroup = new THREE.Group();
+        forestGroup.position.set(45, 0, 15);
+        worldGroup.add(forestGroup);
+
+        for (let i = 0; i < 150; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 5 + Math.random() * 35;
+            const x = Math.cos(angle) * dist;
+            const z = Math.sin(angle) * dist;
+            const scale = 0.7 + Math.random() * 1.3;
+
+            // Стовбур
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * scale, 0.4 * scale, 3 * scale, 6), treeTrunkMat);
+            trunk.position.set(x, 1.5 * scale, z);
+            trunk.castShadow = true;
+            forestGroup.add(trunk);
+
+            // Крона (кілька ярусів)
+            for (let j = 0; j < 3; j++) {
+                const crown = new THREE.Mesh(new THREE.ConeGeometry((2.5 - j * 0.5) * scale, 3 * scale, 8), treeMat);
+                crown.position.set(x, (3 + j * 2) * scale, z);
+                crown.castShadow = true;
+                forestGroup.add(crown);
+            }
+        }
+
+        // Гойдалкова Верба
+        const whompingGroup = new THREE.Group();
+        whompingGroup.position.set(35, 0, -5);
+        worldGroup.add(whompingGroup);
+
+        const whompingTrunk = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, 8, 8), treeTrunkMat);
+        whompingTrunk.position.y = 4;
+        whompingTrunk.castShadow = true;
+        whompingGroup.add(whompingTrunk);
+
+        // Гілки верби
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const branchLength = 5 + Math.random() * 4;
+            const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, branchLength, 4), treeTrunkMat);
+            branch.position.set(Math.cos(angle) * 2, 7 + Math.random() * 2, Math.sin(angle) * 2);
+            branch.rotation.z = Math.cos(angle) * 0.5;
+            branch.rotation.x = Math.sin(angle) * 0.5;
+            whompingGroup.add(branch);
+
+            // Листя на кінцях гілок
+            const leaves = new THREE.Mesh(new THREE.SphereGeometry(1.5, 6, 6), treeMat);
+            leaves.position.set(
+                Math.cos(angle) * (2 + branchLength * 0.5), 
+                7 + Math.random() * 2 - 1, 
+                Math.sin(angle) * (2 + branchLength * 0.5)
+            );
+            whompingGroup.add(leaves);
+        }
+
+        // ===== ХИЖИНА ГЕҐРІДА =====
+        const hagridGroup = new THREE.Group();
+        hagridGroup.position.set(38, 0, 25);
+        worldGroup.add(hagridGroup);
+
+        const hutBase = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.5, 4, 8), hutMat);
+        hutBase.position.y = 2;
+        hutBase.castShadow = true;
+        hagridGroup.add(hutBase);
+
+        const hutRoof = new THREE.Mesh(new THREE.ConeGeometry(5.5, 4, 8), hutRoofMat);
+        hutRoof.position.y = 6;
+        hutRoof.castShadow = true;
+        hagridGroup.add(hutRoof);
+
+        const hutDoor = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.5), new THREE.MeshStandardMaterial({ color: 0x3d2817 }));
+        hutDoor.position.set(0, 1.5, 4.6);
+        hagridGroup.add(hutDoor);
+
+        // Гарбузи
+        for (let i = 0; i < 8; i++) {
+            const pumpkin = new THREE.Mesh(new THREE.SphereGeometry(0.4 + Math.random() * 0.3, 8, 8), pumpkinMat);
+            pumpkin.position.set(3 + Math.random() * 4, 0.3, 2 + Math.random() * 3);
+            pumpkin.scale.y = 0.7;
+            hagridGroup.add(pumpkin);
+        }
+
+        // Паркан
+        for (let i = 0; i < 20; i++) {
+            const angle = (i / 20) * Math.PI * 2;
+            const fencePost = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, 0.2), woodMat);
+            fencePost.position.set(Math.cos(angle) * 7, 0.75, Math.sin(angle) * 7);
+            hagridGroup.add(fencePost);
+        }
+
+        // ===== ГОҐСМІД =====
+        const hogsmeadeGroup = new THREE.Group();
+        hogsmeadeGroup.position.set(-50, 0, -20);
+        worldGroup.add(hogsmeadeGroup);
+
+        const houseColors = [0x8b7355, 0xa0826d, 0x9b8b7a, 0x7a6a5a, 0x8a7a6a];
+        const housePositions = [
+            [0, 0, 0], [8, 0, 3], [-7, 0, 4], [3, 0, -8], 
+            [-5, 0, -6], [10, 0, -5], [-10, 0, -2]
+        ];
+
+        housePositions.forEach((pos, idx) => {
+            const houseGroup = new THREE.Group();
+            houseGroup.position.set(pos[0], 0, pos[2]);
+
+            const width = 3 + Math.random() * 2;
+            const depth = 3 + Math.random() * 2;
+            const height = 3 + Math.random() * 2;
+
+            const houseMat = new THREE.MeshStandardMaterial({ 
+                color: houseColors[idx % houseColors.length], 
+                roughness: 0.9 
+            });
+
+            const house = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), houseMat);
+            house.position.y = height / 2;
+            house.castShadow = true;
+            houseGroup.add(house);
+
+            const roofH = new THREE.Mesh(new THREE.ConeGeometry(Math.max(width, depth) * 0.7, 2.5, 4), roofMat);
+            roofH.position.y = height + 1.25;
+            roofH.rotation.y = Math.PI / 4;
+            roofH.castShadow = true;
+            houseGroup.add(roofH);
+
+            // Димарі
+            if (Math.random() > 0.5) {
+                const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2, 0.6), darkStoneMat);
+                chimney.position.set(width * 0.3, height + 2, depth * 0.3);
+                houseGroup.add(chimney);
+            }
+
+            hogsmeadeGroup.add(houseGroup);
+        });
+
+        // ===== ВИТТЯЧА ХАТА =====
+        const shackGroup = new THREE.Group();
+        shackGroup.position.set(-55, 0, 10);
+        worldGroup.add(shackGroup);
+
+        // Основа (похилена)
+        const shackBase = new THREE.Mesh(new THREE.BoxGeometry(5, 4, 5), new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 1 }));
+        shackBase.position.y = 2;
+        shackBase.rotation.z = 0.1;
+        shackBase.rotation.x = 0.05;
+        shackBase.castShadow = true;
+        shackGroup.add(shackBase);
+
+        // Дах (похилений)
+        const shackRoof = new THREE.Mesh(new THREE.ConeGeometry(4, 3, 4), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 }));
+        shackRoof.position.y = 5;
+        shackRoof.rotation.z = 0.1;
+        shackRoof.rotation.x = 0.05;
+        shackGroup.add(shackRoof);
+
+        // Дерев'яні підпори
+        for (let i = 0; i < 4; i++) {
+            const support = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3, 0.3), woodMat);
+            const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+            support.position.set(Math.cos(angle) * 3, 1.5, Math.sin(angle) * 3);
+            support.rotation.z = Math.cos(angle) * 0.3;
+            support.rotation.x = Math.sin(angle) * 0.3;
+            shackGroup.add(support);
+        }
+
+        // ===== ПОЛЕ ДЛЯ КВІДИЧУ =====
+        const pitchGroup = new THREE.Group();
+        pitchGroup.position.set(35, 0.1, -35);
+        worldGroup.add(pitchGroup);
+
+        const pitchGround = new THREE.Mesh(new THREE.CircleGeometry(18, 32), new THREE.MeshStandardMaterial({ color: 0x6b8e23, roughness: 1 }));
+        pitchGround.rotation.x = -Math.PI / 2;
+        pitchGroup.add(pitchGround);
+
+        // Ворота (6 стовпчиків)
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 10, 8), darkStoneMat);
+            post.position.set(Math.cos(angle) * 15, 5, Math.sin(angle) * 15);
+            post.castShadow = true;
+            pitchGroup.add(post);
+
+            // Кільця на верхівках
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.15, 8, 16), goldMat);
+            ring.position.set(Math.cos(angle) * 15, 10, Math.sin(angle) * 15);
+            ring.rotation.x = Math.PI / 2;
+            pitchGroup.add(ring);
+        }
+
+        // ===== ГОҐВОРТС-ЕКСПРЕС =====
+        const trainGroup = new THREE.Group();
+        trainGroup.position.set(-15, 0.5, 35);
+        trainGroup.rotation.y = 0.3;
+        worldGroup.add(trainGroup);
+
+        const trainRed = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.6 });
+        const trainBlack = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 });
+        const trainGold = new THREE.MeshStandardMaterial({ color: 0xd4a017, metalness: 0.6, roughness: 0.3 });
+
+        // Локомотив
+        const locomotive = new THREE.Mesh(new THREE.BoxGeometry(3.5, 4, 8), trainRed);
+        locomotive.position.y = 2.5;
+        locomotive.castShadow = true;
+        trainGroup.add(locomotive);
+
+        // Кабіна
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(3.5, 5, 3), trainRed);
+        cabin.position.set(0, 3, -3);
+        cabin.castShadow = true;
+        trainGroup.add(cabin);
+
+        // Димар
+        const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 3, 8), trainBlack);
+        chimney.position.set(0, 6.5, -2);
+        trainGroup.add(chimney);
+
+        // Колеса
+        for (let i = 0; i < 3; i++) {
+            for (let side = -1; side <= 1; side += 2) {
+                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.3, 12), trainBlack);
+                wheel.rotation.x = Math.PI / 2;
+                wheel.position.set(side * 2, 0.8, -2 + i * 3);
+                trainGroup.add(wheel);
+            }
+        }
+
+        // Вагони
+        for (let c = 0; c < 3; c++) {
+            const carriage = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.5, 7), trainRed);
+            carriage.position.set(0, 2.3, 10 + c * 8);
+            carriage.castShadow = true;
+            trainGroup.add(carriage);
+
+            const carriageRoof = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 7, 3, 1, false, 0, Math.PI), trainBlack);
+            carriageRoof.rotation.z = Math.PI / 2;
+            carriageRoof.position.set(0, 4.3, 10 + c * 8);
+            trainGroup.add(carriageRoof);
+
+            for (let i = 0; i < 2; i++) {
+                for (let side = -1; side <= 1; side += 2) {
+                    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.3, 12), trainBlack);
+                    wheel.rotation.x = Math.PI / 2;
+                    wheel.position.set(side * 1.8, 0.7, 10 + c * 8 - 2 + i * 4);
+                    trainGroup.add(wheel);
+                }
+            }
+        }
+
+        // Рейки
+        const trackGeo = new THREE.BoxGeometry(1, 0.2, 60);
+        const track1 = new THREE.Mesh(trackGeo, trainBlack);
+        track1.position.set(-1.5, 0.1, 20);
+        trainGroup.add(track1);
+        const track2 = new THREE.Mesh(trackGeo, trainBlack);
+        track2.position.set(1.5, 0.1, 20);
+        trainGroup.add(track2);
+
+        // Шпали
+        for (let i = 0; i < 30; i++) {
+            const sleeper = new THREE.Mesh(new THREE.BoxGeometry(4, 0.15, 0.6), woodMat);
+            sleeper.position.set(0, 0, -5 + i * 2);
+            trainGroup.add(sleeper);
+        }
+
+        // Дим від потяга
+        const smokeParticles = [];
+        for (let i = 0; i < 20; i++) {
+            const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.5 + Math.random(), 8, 8), smokeMat);
+            smoke.position.set(0, 8, -2);
+            trainGroup.add(smoke);
+            smokeParticles.push({
+                mesh: smoke,
+                speed: 0.02 + Math.random() * 0.03,
+                offset: Math.random() * Math.PI * 2,
+                initialY: 8
+            });
+        }
+
+        // ===== ДОРІЖКИ =====
+        const pathPoints = [
+            [-50, -20, 0], [-40, -15, 0], [-30, -10, 0], [-20, -5, 0], [-10, 0, 0],
+            [0, 0, 0], [10, 2, 0], [20, 5, 0], [30, 10, 0], [38, 15, 0],
+            [0, 0, 0], [5, 0, 5], [10, 0, 10], [15, 0, 15], [20, 0, 20], [25, 0, 25], [30, 0, 30],
+            [0, 0, 0], [-5, 0, -5], [-10, 0, -10], [-15, 0, -15], [-20, 0, -20], [-25, 0, -25], [-30, 0, -30],
+            [0, 0, 0], [5, 0, -5], [10, 0, -10], [15, 0, -15], [20, 0, -20], [25, 0, -25], [30, 0, -30], [35, 0, -35]
+        ];
+
+        pathPoints.forEach((point, i) => {
+            if (i === 0) return;
+            const prev = pathPoints[i - 1];
+            const dx = point[0] - prev[0];
+            const dz = point[2] - prev[2];
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const pathSegment = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, dist + 1), pathMat);
+            pathSegment.position.set((point[0] + prev[0]) / 2, 0.05, (point[2] + prev[2]) / 2);
+            pathSegment.rotation.y = Math.atan2(dx, dz);
+            pathSegment.receiveShadow = true;
+            worldGroup.add(pathSegment);
+        });
+
+        // ===== ЧОВНИ НА ОЗЕРІ =====
+        for (let i = 0; i < 4; i++) {
+            const boatGroup = new THREE.Group();
+            const angle = (i / 4) * Math.PI * 2 + Math.random();
+            const dist = 10 + Math.random() * 15;
+            boatGroup.position.set(Math.cos(angle) * dist, -0.5, Math.sin(angle) * dist);
+            boatGroup.rotation.y = Math.random() * Math.PI;
+
+            const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 3), woodMat);
+            hull.position.y = 0.2;
+            boatGroup.add(hull);
+
+            const front = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1, 4), woodMat);
+            front.rotation.z = Math.PI / 2;
+            front.position.set(0, 0.2, 1.5);
+            boatGroup.add(front);
+
+            const back = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1, 4), woodMat);
+            back.rotation.z = -Math.PI / 2;
+            back.position.set(0, 0.2, -1.5);
+            boatGroup.add(back);
+
+            worldGroup.add(boatGroup);
+        }
+
+        // Сквоп (щупальця в озері)
+        const squidGroup = new THREE.Group();
+        squidGroup.position.set(5, -2, 5);
+        worldGroup.add(squidGroup);
+
+        for (let i = 0; i < 8; i++) {
+            const tentacle = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 4, 6), new THREE.MeshStandardMaterial({ color: 0x8b7d6b, roughness: 0.7 }));
+            const angle = (i / 8) * Math.PI * 2;
+            tentacle.position.set(Math.cos(angle) * 1, 1, Math.sin(angle) * 1);
+            tentacle.rotation.x = Math.sin(angle) * 0.3;
+            tentacle.rotation.z = Math.cos(angle) * 0.3;
+            squidGroup.add(tentacle);
+        }
+
+        const squidHead = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), new THREE.MeshStandardMaterial({ color: 0x8b7d6b, roughness: 0.7 }));
+        squidHead.position.y = 3;
+        squidGroup.add(squidHead);
+
+        // ===== ХМАРИ =====
+        const cloudGroup = new THREE.Group();
+        scene.add(cloudGroup);
+
+        for (let i = 0; i < 15; i++) {
+            const cloud = new THREE.Group();
+            const cloudMat = new THREE.MeshStandardMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.8, 
+                roughness: 1 
+            });
+
+            for (let j = 0; j < 5; j++) {
+                const puff = new THREE.Mesh(new THREE.SphereGeometry(3 + Math.random() * 3, 8, 8), cloudMat);
+                puff.position.set((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 5);
+                cloud.add(puff);
+            }
+
+            cloud.position.set((Math.random() - 0.5) * 200, 50 + Math.random() * 30, (Math.random() - 0.5) * 200);
+            cloudGroup.add(cloud);
+        }
+
+        // ===== БРАМА =====
+        const gateGroup = new THREE.Group();
+        gateGroup.position.set(-8, 0, 20);
+        worldGroup.add(gateGroup);
+
+        const gateLeft = new THREE.Mesh(new THREE.BoxGeometry(1, 6, 1), darkStoneMat);
+        gateLeft.position.set(-2, 3, 0);
+        gateLeft.castShadow = true;
+        gateGroup.add(gateLeft);
+
+        const gateRight = new THREE.Mesh(new THREE.BoxGeometry(1, 6, 1), darkStoneMat);
+        gateRight.position.set(2, 3, 0);
+        gateRight.castShadow = true;
+        gateGroup.add(gateRight);
+
+        const wingLeft = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5, 0.1), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8 }));
+        wingLeft.position.set(-1, 2.5, 0);
+        gateGroup.add(wingLeft);
+
+        const wingRight = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5, 0.1), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8 }));
+        wingRight.position.set(1, 2.5, 0);
+        gateGroup.add(wingRight);
+
+        // Статуї на воротах
+        const statueLeft = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2, 4), stoneMat);
+        statueLeft.position.set(-2, 7, 0);
+        gateGroup.add(statueLeft);
+
+        const statueRight = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2, 4), stoneMat);
+        statueRight.position.set(2, 7, 0);
+        gateGroup.add(statueRight);
+
+        // ===== АНІМАЦІЯ =====
+        let time = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            // Анімація води
+            waterMat.map.offset.x = Math.sin(time * 0.5) * 0.1;
+            waterMat.map.offset.y = Math.cos(time * 0.3) * 0.1;
+
+            // Анімація диму
+            smokeParticles.forEach((p, i) => {
+                p.mesh.position.y += p.speed;
+                p.mesh.position.x += Math.sin(time + p.offset) * 0.01;
+                p.mesh.scale.setScalar(1 + (p.mesh.position.y - p.initialY) * 0.1);
+                p.mesh.material.opacity = Math.max(0, 0.4 - (p.mesh.position.y - p.initialY) * 0.05);
+
+                if (p.mesh.position.y > 15) {
+                    p.mesh.position.y = p.initialY;
+                    p.mesh.position.x = 0;
+                    p.mesh.scale.setScalar(1);
+                    p.mesh.material.opacity = 0.4;
+                }
+            });
+
+            // Анімація хмар
+            cloudGroup.children.forEach((cloud, i) => {
+                cloud.position.x += 0.02 * (i % 2 === 0 ? 1 : -1);
+                if (cloud.position.x > 150) cloud.position.x = -150;
+                if (cloud.position.x < -150) cloud.position.x = 150;
+            });
+
+            // Анімація сквопа
+            squidGroup.children.forEach((child, i) => {
+                if (i < 8) {
+                    child.rotation.y = Math.sin(time * 2 + i) * 0.2;
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Ресайз
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Прибрати завантаження
+        setTimeout(() => {
+            document.getElementById('loading').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 1000);
+        }, 2000);
+
+        animate();
+    </script>
+</body>
+</html>
